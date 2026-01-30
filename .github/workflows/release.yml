@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-tools-dev qt6-tools-dev-tools libqt6network6
-          sudo apt-get install -y librsvg2-bin file
+          sudo apt-get install -y librsvg2-bin file libssl3
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -52,6 +52,8 @@ jobs:
           Categories=Utility;
           EOF
           rsvg-convert -w 256 -h 256 resources/freecad-icon.svg -o AppDir/freecad.png
+          mkdir -p AppDir/usr/lib
+          cp -L /lib/x86_64-linux-gnu/libssl.so.3 /lib/x86_64-linux-gnu/libcrypto.so.3 AppDir/usr/lib/
 
       - name: Download linuxdeploy and Qt plugin
         run: |
