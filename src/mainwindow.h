@@ -63,6 +63,8 @@ private slots:
     void onTrayShowWindow();
     void onTrayQuit();
     void onTrayLaunchVersion(const AppImageInfo &appImage);
+    void onLaunchRow(int row);
+    void onDeleteRow(int row);
 
 protected:
     void changeEvent(QEvent *event) override;

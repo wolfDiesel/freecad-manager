@@ -5,6 +5,8 @@
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QFileDialog>
+#include <QFile>
+#include <QFileInfo>
 #include <QCoreApplication>
 #include <QApplication>
 #include <QRegularExpression>
@@ -387,26 +389,37 @@ void MainWindow::onScanAppImages()
 void MainWindow::onAppImagesScanned(const QList<AppImageInfo> &images)
 {
     m_appImages = images;
-    
     std::sort(m_appImages.begin(), m_appImages.end(), [](const AppImageInfo &a, const AppImageInfo &b) {
         return a.lastModified > b.lastModified;
     });
-    
     m_appImageList->clear();
-    
-    for (const AppImageInfo &info : m_appImages) {
+    for (int i = 0; i < m_appImages.size(); ++i) {
+        const AppImageInfo &info = m_appImages[i];
         QString displayText = info.fileName;
         if (!info.version.isEmpty()) {
             displayText += QString(" (v%1)").arg(info.version);
         }
         m_appImageList->addItem(displayText);
+        QWidget *row = new QWidget(this);
+        QHBoxLayout *h = new QHBoxLayout(row);
+        h->setContentsMargins(4, 2, 4, 2);
+        h->setSpacing(8);
+        QLabel *lbl = new QLabel(displayText, row);
+        lbl->setTextInteractionFlags(Qt::NoTextInteraction);
+        QPushButton *launchBtn = new QPushButton(tr("Launch"), row);
+        QPushButton *deleteBtn = new QPushButton(tr("Delete"), row);
+        h->addWidget(lbl, 1);
+        h->addWidget(launchBtn);
+        h->addWidget(deleteBtn);
+        int rowIndex = i;
+        connect(launchBtn, &QPushButton::clicked, this, [this, rowIndex]() { onLaunchRow(rowIndex); });
+        connect(deleteBtn, &QPushButton::clicked, this, [this, rowIndex]() { onDeleteRow(rowIndex); });
+        m_appImageList->setItemWidget(m_appImageList->item(i), row);
     }
-    
     if (m_appImages.isEmpty()) {
         m_appImageList->addItem(tr("No AppImage files found"));
         m_appImageList->item(0)->setFlags(Qt::NoItemFlags);
     }
-    
     m_logOutput->append(tr("Found %1 AppImage file(s)").arg(m_appImages.size()));
     updateReleasesDownloadStatus();
     m_trayManager->updateVersionsMenu(m_appImages);
@@ -432,25 +445,56 @@ void MainWindow::onAppImageSelected()
         m_selectedAppImage.lastModified.toString("yyyy-MM-dd HH:mm:ss")));
 }
 
+void MainWindow::onLaunchRow(int row)
+{
+    if (row < 0 || row >= m_appImages.size()) return;
+    m_appImageList->setCurrentRow(row);
+    m_selectedAppImage = m_appImages[row];
+    if (m_appImageManager->isRunning()) {
+        QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
+        return;
+    }
+    m_appImageManager->setConfigPreset(m_configPreset->currentData().toString());
+    m_logOutput->clear();
+    m_logOutput->append(tr("Launch: %1").arg(m_selectedAppImage.filePath));
+    m_logOutput->append(tr("Configuration: %1").arg(m_configPreset->currentData().toString()));
+    m_logOutput->append("---");
+    m_appImageManager->launchFreeCAD(m_selectedAppImage);
+    m_launchButton->setEnabled(false);
+    m_launchWithParamsButton->setEnabled(false);
+}
+
+void MainWindow::onDeleteRow(int row)
+{
+    if (row < 0 || row >= m_appImages.size()) return;
+    const QString path = m_appImages[row].filePath;
+    QString fileName = QFileInfo(path).fileName();
+    int ret = QMessageBox::question(this, tr("Delete file"),
+        tr("Delete %1?").arg(fileName),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (ret != QMessageBox::Yes) return;
+    if (QFile::remove(path)) {
+        onScanAppImages();
+    } else {
+        QMessageBox::warning(this, tr("Error"), tr("Could not delete file"));
+    }
+}
+
 void MainWindow::onLaunchClicked()
 {
     if (m_selectedAppImage.filePath.isEmpty()) {
         QMessageBox::warning(this, tr("Error"), tr("Select an AppImage file to launch"));
         return;
     }
-    
     if (m_appImageManager->isRunning()) {
         QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
         return;
     }
-    
     m_appImageManager->setConfigPreset(m_configPreset->currentData().toString());
-    
     m_logOutput->clear();
     m_logOutput->append(tr("Launch: %1").arg(m_selectedAppImage.filePath));
     m_logOutput->append(tr("Configuration: %1").arg(m_configPreset->currentData().toString()));
     m_logOutput->append("---");
-
     m_appImageManager->launchFreeCAD(m_selectedAppImage);
     m_launchButton->setEnabled(false);
     m_launchWithParamsButton->setEnabled(false);

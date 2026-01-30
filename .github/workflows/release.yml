@@ -19,10 +19,11 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Install Qt6
+      - name: Install Qt6 and AppImage deps
         run: |
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-tools-dev qt6-tools-dev-tools libqt6network6
+          sudo apt-get install -y librsvg2-bin file
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -37,12 +38,50 @@ jobs:
           cp -r build/translations release/ 2>/dev/null || true
           cd release && zip -r ../FreeCADLauncher-${{ steps.version.outputs.VERSION }}-Linux-x86_64.zip . && cd ..
 
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir/usr/bin AppDir/usr/share/applications
+          cp build/FreeCADLauncher AppDir/usr/bin/
+          cp -r build/translations AppDir/usr/bin/ 2>/dev/null || true
+          cat > AppDir/usr/share/applications/FreeCADLauncher.desktop << 'EOF'
+          [Desktop Entry]
+          Name=FreeCAD Launcher
+          Exec=FreeCADLauncher
+          Icon=freecad
+          Type=Application
+          Categories=Utility;
+          EOF
+          rsvg-convert -w 256 -h 256 resources/freecad-icon.svg -o AppDir/freecad.png
+
+      - name: Download linuxdeploy and Qt plugin
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O linuxdeploy.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O linuxdeploy-plugin-qt.AppImage
+          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-qt.AppImage
+          mkdir -p linuxdeploy-plugin-qt
+          mv linuxdeploy-plugin-qt.AppImage linuxdeploy-plugin-qt/
+
+      - name: Build AppImage
+        env:
+          QTDIR: /usr/lib/x86_64-linux-gnu/qt6
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          ./linuxdeploy.AppImage --appdir AppDir \
+            -e AppDir/usr/bin/FreeCADLauncher \
+            -d AppDir/usr/share/applications/FreeCADLauncher.desktop \
+            -i AppDir/freecad.png \
+            --plugin qt --output appimage
+          mv FreeCAD_Launcher-*-x86_64.AppImage FreeCADLauncher-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ steps.version.outputs.VERSION }}
-          files: FreeCADLauncher-${{ steps.version.outputs.VERSION }}-Linux-x86_64.zip
+          files: |
+            FreeCADLauncher-${{ steps.version.outputs.VERSION }}-Linux-x86_64.zip
+            FreeCADLauncher-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
