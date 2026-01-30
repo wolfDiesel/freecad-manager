@@ -50,6 +50,7 @@ set(HEADERS
     src/utils/filesizeformatter.h
     src/utils/githubreleasesparser.h
     src/helpers/filesystemchecker.h
+    src/helpers/iconhelper.h
     src/ui/appimageselectordialog.h
     src/ui/releasestablecontroller.h
 )

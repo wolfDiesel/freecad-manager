@@ -1,6 +1,6 @@
 #include "traymanager.h"
+#include "../helpers/iconhelper.h"
 #include <QApplication>
-#include <QIcon>
 #include <QVariant>
 
 TrayManager::TrayManager(QObject *parent)
@@ -40,18 +40,12 @@ void TrayManager::setup(QWidget *mainWindow)
 void TrayManager::setupTrayIcon()
 {
     m_trayIcon = new QSystemTrayIcon(this);
-    
-    QIcon trayIcon;
-    if (QIcon::hasThemeIcon("freecad")) {
-        trayIcon = QIcon::fromTheme("freecad");
-    } else {
-        trayIcon = QIcon(":/freecad-icon.svg");
-    }
-    
+
+    QIcon trayIcon = IconHelper::applicationIcon();
     if (trayIcon.isNull()) {
         trayIcon = QIcon::fromTheme("application-x-executable");
     }
-    
+
     m_trayIcon->setIcon(trayIcon);
     m_trayIcon->setToolTip(tr("FreeCAD Launcher"));
     

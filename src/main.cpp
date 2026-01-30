@@ -2,7 +2,7 @@
 #define APP_VERSION "1.0.2"
 #endif
 #include <QApplication>
-#include <QIcon>
+#include "helpers/iconhelper.h"
 #include "mainwindow.h"
 #include "types.h"
 #include "services/downloader.h"
@@ -20,12 +20,7 @@ int main(int argc, char *argv[])
     app.setApplicationVersion(APP_VERSION);
     app.setOrganizationName("FreeCAD Tools");
 
-    QIcon appIcon;
-    if (QIcon::hasThemeIcon("freecad")) {
-        appIcon = QIcon::fromTheme("freecad");
-    } else {
-        appIcon = QIcon(":/freecad-icon.svg");
-    }
+    QIcon appIcon = IconHelper::applicationIcon();
     if (!appIcon.isNull()) {
         app.setWindowIcon(appIcon);
     }

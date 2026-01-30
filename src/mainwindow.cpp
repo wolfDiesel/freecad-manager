@@ -43,7 +43,12 @@ MainWindow::MainWindow(IDownloader *downloader, IAppImageManager *appImageManage
     , m_releasesTableController(nullptr)
     , m_downloadRowIndex(-1)
 {
-    m_scriptDir = QCoreApplication::applicationDirPath();
+    const QByteArray appImagePath = qgetenv("APPIMAGE");
+    if (!appImagePath.isEmpty()) {
+        m_scriptDir = QFileInfo(QFile::decodeName(appImagePath)).absolutePath();
+    } else {
+        m_scriptDir = QCoreApplication::applicationDirPath();
+    }
     QString savedLang = QSettings().value(QStringLiteral("language"), QString()).toString();
     setApplicationLanguage(savedLang.isEmpty() ? QLocale::system().name() : savedLang, false);
     m_downloader->setWorkingDirectory(m_scriptDir);
