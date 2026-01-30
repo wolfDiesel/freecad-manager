@@ -1,0 +1,14 @@
+build/
+*.qm
+*.user
+*.autosave
+.cache/
+*.o
+*.a
+*.so
+*.d
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+FreeCADLauncher_autogen/
