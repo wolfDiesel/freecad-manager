@@ -1,5 +1,5 @@
 #ifndef APP_VERSION
-#define APP_VERSION "1.0.1"
+#define APP_VERSION "1.0.2"
 #endif
 #include <QApplication>
 #include <QIcon>
