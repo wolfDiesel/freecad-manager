@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(FreeCADLauncher VERSION 1.0.0 LANGUAGES CXX)
+project(FreeCADLauncher VERSION 1.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -93,5 +93,5 @@ if(LRELEASE_EXECUTABLE)
     add_dependencies(${PROJECT_NAME} FreeCADLauncher_translations)
 endif()
 if(Qt${QT_VERSION_MAJOR}LinguistTools_FOUND)
-    qt_add_lupdate(TS_FILES SOURCE_TARGETS ${PROJECT_NAME})
+    qt_add_lupdate(TS_FILES ${TS_FILES} SOURCE_TARGETS ${PROJECT_NAME})
 endif()
