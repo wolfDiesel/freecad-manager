@@ -65,6 +65,9 @@ private slots:
     void onTrayLaunchVersion(const AppImageInfo &appImage);
     void onLaunchRow(int row);
     void onDeleteRow(int row);
+    void onLaunchFromButton();
+    void onDeleteFromButton();
+    void deleteAppImageByPath(const QString &path);
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -101,7 +104,7 @@ private:
     QTabWidget *m_tabWidget;
     QWidget *m_launchTab;
     QWidget *m_githubTab;
-    QListWidget *m_appImageList;
+    QTableWidget *m_appImageTable;
     QLabel *m_versionLabel;
     QLabel *m_fileSizeLabel;
     QLabel *m_lastModifiedLabel;

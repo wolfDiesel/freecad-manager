@@ -150,14 +150,22 @@ void MainWindow::setupLaunchTab()
     
     m_listGroup = new QGroupBox(tr("Available FreeCAD versions"), this);
     QVBoxLayout *listLayout = new QVBoxLayout();
-    m_appImageList = new QListWidget(this);
-    m_appImageList->setSelectionMode(QAbstractItemView::SingleSelection);
-    listLayout->addWidget(m_appImageList);
+    m_appImageTable = new QTableWidget(this);
+    m_appImageTable->setColumnCount(2);
+    m_appImageTable->setHorizontalHeaderLabels(QStringList() << tr("File") << tr("Actions"));
+    m_appImageTable->horizontalHeader()->setStretchLastSection(false);
+    m_appImageTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_appImageTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_appImageTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_appImageTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_appImageTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_appImageTable->verticalHeader()->setVisible(false);
+    listLayout->addWidget(m_appImageTable);
     m_listGroup->setLayout(listLayout);
     mainLayout->addWidget(m_listGroup);
     
-    connect(m_appImageList, &QListWidget::itemSelectionChanged, this, &MainWindow::onAppImageSelected);
-    connect(m_appImageList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLaunchClicked);
+    connect(m_appImageTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onAppImageSelected);
+    connect(m_appImageTable, &QTableWidget::itemDoubleClicked, this, &MainWindow::onLaunchClicked);
     
     m_infoGroup = new QGroupBox(tr("Information"), this);
     QVBoxLayout *infoLayout = new QVBoxLayout();
@@ -397,33 +405,38 @@ void MainWindow::onAppImagesScanned(const QList<AppImageInfo> &images)
     std::sort(m_appImages.begin(), m_appImages.end(), [](const AppImageInfo &a, const AppImageInfo &b) {
         return a.lastModified > b.lastModified;
     });
-    m_appImageList->clear();
+    m_appImageTable->setRowCount(0);
+    m_appImageTable->setRowCount(m_appImages.size());
     for (int i = 0; i < m_appImages.size(); ++i) {
         const AppImageInfo &info = m_appImages[i];
         QString displayText = info.fileName;
         if (!info.version.isEmpty()) {
             displayText += QString(" (v%1)").arg(info.version);
         }
-        m_appImageList->addItem(displayText);
-        QWidget *row = new QWidget(this);
-        QHBoxLayout *h = new QHBoxLayout(row);
-        h->setContentsMargins(4, 2, 4, 2);
-        h->setSpacing(8);
-        QLabel *lbl = new QLabel(displayText, row);
-        lbl->setTextInteractionFlags(Qt::NoTextInteraction);
-        QPushButton *launchBtn = new QPushButton(tr("Launch"), row);
-        QPushButton *deleteBtn = new QPushButton(tr("Delete"), row);
-        h->addWidget(lbl, 1);
-        h->addWidget(launchBtn);
-        h->addWidget(deleteBtn);
-        int rowIndex = i;
-        connect(launchBtn, &QPushButton::clicked, this, [this, rowIndex]() { onLaunchRow(rowIndex); });
-        connect(deleteBtn, &QPushButton::clicked, this, [this, rowIndex]() { onDeleteRow(rowIndex); });
-        m_appImageList->setItemWidget(m_appImageList->item(i), row);
+        QTableWidgetItem *fileItem = new QTableWidgetItem(displayText);
+        fileItem->setFlags(fileItem->flags() & ~Qt::ItemIsEditable);
+        m_appImageTable->setItem(i, 0, fileItem);
+        
+        QWidget *btnWidget = new QWidget();
+        QHBoxLayout *btnLayout = new QHBoxLayout(btnWidget);
+        btnLayout->setContentsMargins(4, 2, 4, 2);
+        btnLayout->setSpacing(8);
+        QPushButton *launchBtn = new QPushButton(tr("Launch"), btnWidget);
+        QPushButton *deleteBtn = new QPushButton(tr("Delete"), btnWidget);
+        launchBtn->setProperty("filePath", info.filePath);
+        deleteBtn->setProperty("filePath", info.filePath);
+        btnLayout->addWidget(launchBtn);
+        btnLayout->addWidget(deleteBtn);
+        btnLayout->addStretch();
+        connect(launchBtn, &QPushButton::clicked, this, &MainWindow::onLaunchFromButton);
+        connect(deleteBtn, &QPushButton::clicked, this, &MainWindow::onDeleteFromButton);
+        m_appImageTable->setCellWidget(i, 1, btnWidget);
     }
     if (m_appImages.isEmpty()) {
-        m_appImageList->addItem(tr("No AppImage files found"));
-        m_appImageList->item(0)->setFlags(Qt::NoItemFlags);
+        m_appImageTable->setRowCount(1);
+        QTableWidgetItem *noFilesItem = new QTableWidgetItem(tr("No AppImage files found"));
+        noFilesItem->setFlags(Qt::NoItemFlags);
+        m_appImageTable->setItem(0, 0, noFilesItem);
     }
     m_logOutput->append(tr("Found %1 AppImage file(s)").arg(m_appImages.size()));
     updateReleasesDownloadStatus();
@@ -432,7 +445,7 @@ void MainWindow::onAppImagesScanned(const QList<AppImageInfo> &images)
 
 void MainWindow::onAppImageSelected()
 {
-    int currentRow = m_appImageList->currentRow();
+    int currentRow = m_appImageTable->currentRow();
     if (currentRow < 0 || currentRow >= m_appImages.size()) {
         m_versionLabel->setText(tr("Version: -"));
         m_fileSizeLabel->setText(tr("Size: -"));
@@ -453,7 +466,7 @@ void MainWindow::onAppImageSelected()
 void MainWindow::onLaunchRow(int row)
 {
     if (row < 0 || row >= m_appImages.size()) return;
-    m_appImageList->setCurrentRow(row);
+    m_appImageTable->selectRow(row);
     m_selectedAppImage = m_appImages[row];
     if (m_appImageManager->isRunning()) {
         QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
@@ -473,6 +486,32 @@ void MainWindow::onDeleteRow(int row)
 {
     if (row < 0 || row >= m_appImages.size()) return;
     const QString path = m_appImages[row].filePath;
+    deleteAppImageByPath(path);
+}
+
+void MainWindow::onLaunchFromButton()
+{
+    QPushButton *btn = qobject_cast<QPushButton*>(sender());
+    if (!btn) return;
+    QString filePath = btn->property("filePath").toString();
+    for (int i = 0; i < m_appImages.size(); ++i) {
+        if (m_appImages[i].filePath == filePath) {
+            onLaunchRow(i);
+            return;
+        }
+    }
+}
+
+void MainWindow::onDeleteFromButton()
+{
+    QPushButton *btn = qobject_cast<QPushButton*>(sender());
+    if (!btn) return;
+    QString filePath = btn->property("filePath").toString();
+    deleteAppImageByPath(filePath);
+}
+
+void MainWindow::deleteAppImageByPath(const QString &path)
+{
     QString fileName = QFileInfo(path).fileName();
     int ret = QMessageBox::question(this, tr("Delete file"),
         tr("Delete %1?").arg(fileName),
