@@ -74,9 +74,11 @@ MainWindow::MainWindow(IDownloader *downloader, IAppImageManager *appImageManage
     connect(m_trayManager, &ITrayManager::showWindowRequested, this, &MainWindow::onTrayShowWindow);
     connect(m_trayManager, &ITrayManager::quitRequested, this, &MainWindow::onTrayQuit);
     connect(m_trayManager, &ITrayManager::launchVersionRequested, this, &MainWindow::onTrayLaunchVersion);
+    connect(m_trayManager, &ITrayManager::launchLastRequested, this, &MainWindow::onTrayLaunchLast);
 
     setupUI();
     m_trayManager->setup(this);
+    m_trayManager->updateLastLaunched(getLastLaunched());
     onScanAppImages();
 }
 
@@ -218,16 +220,18 @@ void MainWindow::setupLaunchTab()
     m_launchButton->setStyleSheet("font-weight: bold; padding: 8px;");
     m_launchWithParamsButton = new QPushButton(tr("Launch with parameters"), this);
     m_launchWithParamsButton->setStyleSheet("padding: 8px;");
-    int buttonWidth = qMax(m_launchButton->sizeHint().width(), m_launchWithParamsButton->sizeHint().width());
-    m_launchButton->setMinimumWidth(buttonWidth);
-    m_launchWithParamsButton->setMinimumWidth(buttonWidth);
+    m_launchLastButton = new QPushButton(tr("Launch last"), this);
+    m_launchLastButton->setStyleSheet("padding: 8px;");
     buttonLayout->addWidget(m_launchButton);
     buttonLayout->addWidget(m_launchWithParamsButton);
+    buttonLayout->addWidget(m_launchLastButton);
     buttonLayout->addStretch();
     mainLayout->addLayout(buttonLayout);
     
     connect(m_launchButton, &QPushButton::clicked, this, &MainWindow::onLaunchClicked);
     connect(m_launchWithParamsButton, &QPushButton::clicked, this, &MainWindow::onLaunchWithParamsClicked);
+    connect(m_launchLastButton, &QPushButton::clicked, this, &MainWindow::onLaunchLastClicked);
+    updateLaunchLastButton();
     
     m_logGroup = new QGroupBox(tr("Launch log"), this);
     QVBoxLayout *logLayout = new QVBoxLayout();
@@ -468,18 +472,7 @@ void MainWindow::onLaunchRow(int row)
     if (row < 0 || row >= m_appImages.size()) return;
     m_appImageTable->selectRow(row);
     m_selectedAppImage = m_appImages[row];
-    if (m_appImageManager->isRunning()) {
-        QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
-        return;
-    }
-    m_appImageManager->setConfigPreset(m_configPreset->currentData().toString());
-    m_logOutput->clear();
-    m_logOutput->append(tr("Launch: %1").arg(m_selectedAppImage.filePath));
-    m_logOutput->append(tr("Configuration: %1").arg(m_configPreset->currentData().toString()));
-    m_logOutput->append("---");
-    m_appImageManager->launchFreeCAD(m_selectedAppImage);
-    m_launchButton->setEnabled(false);
-    m_launchWithParamsButton->setEnabled(false);
+    launchAppImageByPath(m_selectedAppImage.filePath);
 }
 
 void MainWindow::onDeleteRow(int row)
@@ -530,18 +523,7 @@ void MainWindow::onLaunchClicked()
         QMessageBox::warning(this, tr("Error"), tr("Select an AppImage file to launch"));
         return;
     }
-    if (m_appImageManager->isRunning()) {
-        QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
-        return;
-    }
-    m_appImageManager->setConfigPreset(m_configPreset->currentData().toString());
-    m_logOutput->clear();
-    m_logOutput->append(tr("Launch: %1").arg(m_selectedAppImage.filePath));
-    m_logOutput->append(tr("Configuration: %1").arg(m_configPreset->currentData().toString()));
-    m_logOutput->append("---");
-    m_appImageManager->launchFreeCAD(m_selectedAppImage);
-    m_launchButton->setEnabled(false);
-    m_launchWithParamsButton->setEnabled(false);
+    launchAppImageByPath(m_selectedAppImage.filePath);
 }
 
 void MainWindow::onLaunchWithParamsClicked()
@@ -911,13 +893,91 @@ void MainWindow::onTrayLaunchVersion(const AppImageInfo &appImage)
     if (appImage.filePath.isEmpty()) {
         return;
     }
-    
+    launchAppImageByPath(appImage.filePath);
+}
+
+void MainWindow::onTrayLaunchLast()
+{
+    QString lastPath = getLastLaunched();
+    if (!lastPath.isEmpty()) {
+        launchAppImageByPath(lastPath);
+    }
+}
+
+void MainWindow::onLaunchLastClicked()
+{
+    QString lastPath = getLastLaunched();
+    if (lastPath.isEmpty()) {
+        QMessageBox::information(this, tr("Information"), tr("No previously launched version"));
+        return;
+    }
+    if (!QFile::exists(lastPath)) {
+        QMessageBox::warning(this, tr("Error"), tr("Last launched file no longer exists"));
+        saveLastLaunched(QString());
+        return;
+    }
+    launchAppImageByPath(lastPath);
+}
+
+void MainWindow::launchAppImageByPath(const QString &filePath)
+{
+    if (filePath.isEmpty() || !QFile::exists(filePath)) {
+        return;
+    }
     if (m_appImageManager->isRunning()) {
+        QMessageBox::information(this, tr("Information"), tr("FreeCAD is already running"));
         return;
     }
     
+    AppImageInfo info;
+    for (const AppImageInfo &ai : m_appImages) {
+        if (ai.filePath == filePath) {
+            info = ai;
+            break;
+        }
+    }
+    if (info.filePath.isEmpty()) {
+        info.filePath = filePath;
+        info.fileName = QFileInfo(filePath).fileName();
+    }
+    
     m_appImageManager->setConfigPreset(m_configPreset->currentData().toString());
-    m_appImageManager->launchFreeCAD(appImage);
+    m_logOutput->clear();
+    m_logOutput->append(tr("Launch: %1").arg(filePath));
+    m_logOutput->append(tr("Configuration: %1").arg(m_configPreset->currentData().toString()));
+    m_logOutput->append("---");
+    m_appImageManager->launchFreeCAD(info);
+    m_launchButton->setEnabled(false);
+    m_launchWithParamsButton->setEnabled(false);
+    
+    saveLastLaunched(filePath);
+}
+
+void MainWindow::saveLastLaunched(const QString &filePath)
+{
+    QSettings().setValue(QStringLiteral("lastLaunched"), filePath);
+    updateLaunchLastButton();
+    m_trayManager->updateLastLaunched(filePath);
+}
+
+QString MainWindow::getLastLaunched() const
+{
+    return QSettings().value(QStringLiteral("lastLaunched"), QString()).toString();
+}
+
+void MainWindow::updateLaunchLastButton()
+{
+    QString lastPath = getLastLaunched();
+    bool enabled = !lastPath.isEmpty() && QFile::exists(lastPath);
+    m_launchLastButton->setEnabled(enabled);
+    if (enabled) {
+        QString fileName = QFileInfo(lastPath).fileName();
+        m_launchLastButton->setText(tr("Launch last (%1)").arg(fileName));
+        m_launchLastButton->setToolTip(lastPath);
+    } else {
+        m_launchLastButton->setText(tr("Launch last"));
+        m_launchLastButton->setToolTip(QString());
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

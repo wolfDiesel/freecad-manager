@@ -68,6 +68,8 @@ private slots:
     void onLaunchFromButton();
     void onDeleteFromButton();
     void deleteAppImageByPath(const QString &path);
+    void onLaunchLastClicked();
+    void onTrayLaunchLast();
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -80,6 +82,10 @@ private:
     void retranslateUi();
     void setApplicationLanguage(const QString &localeCode, bool sendLanguageChangeEvent = true);
     void onLanguageChanged(int index);
+    void saveLastLaunched(const QString &filePath);
+    QString getLastLaunched() const;
+    void updateLaunchLastButton();
+    void launchAppImageByPath(const QString &filePath);
 
 private:
     QTranslator *m_translator;
@@ -112,6 +118,7 @@ private:
     QPushButton *m_scanButton;
     QPushButton *m_launchButton;
     QPushButton *m_launchWithParamsButton;
+    QPushButton *m_launchLastButton;
     QPushButton *m_syncFromHomeButton;
     QPushButton *m_syncToHomeButton;
     QTextEdit *m_logOutput;

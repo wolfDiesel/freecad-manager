@@ -15,6 +15,7 @@ public:
 
     virtual void setup(QWidget *mainWindow) = 0;
     virtual void updateVersionsMenu(const QList<AppImageInfo> &appImages) = 0;
+    virtual void updateLastLaunched(const QString &filePath) = 0;
     virtual bool isAvailable() const = 0;
     virtual bool isVisible() const = 0;
 
@@ -22,6 +23,7 @@ signals:
     void showWindowRequested();
     void quitRequested();
     void launchVersionRequested(const AppImageInfo &appImage);
+    void launchLastRequested();
 };
 
 #endif

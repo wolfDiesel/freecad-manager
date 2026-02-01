@@ -17,6 +17,7 @@ public:
 
     void setup(QWidget *mainWindow) override;
     void updateVersionsMenu(const QList<AppImageInfo> &appImages) override;
+    void updateLastLaunched(const QString &filePath) override;
     bool isAvailable() const override;
     bool isVisible() const override;
 
@@ -25,6 +26,7 @@ private slots:
     void onShowWindow();
     void onQuitApplication();
     void onLaunchFromTray();
+    void onLaunchLastFromTray();
 
 private:
     void setupTrayIcon();
@@ -34,9 +36,11 @@ private:
     QMenu *m_trayMenu;
     QAction *m_showAction;
     QAction *m_quitAction;
+    QAction *m_launchLastAction;
     QMenu *m_versionsMenu;
     QList<QAction*> m_versionActions;
     QWidget *m_mainWindow;
+    QString m_lastLaunchedPath;
 };
 
 #endif

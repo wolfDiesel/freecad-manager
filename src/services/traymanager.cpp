@@ -2,6 +2,8 @@
 #include "../helpers/iconhelper.h"
 #include <QApplication>
 #include <QVariant>
+#include <QFileInfo>
+#include <QFile>
 
 TrayManager::TrayManager(QObject *parent)
     : ITrayManager(parent)
@@ -9,6 +11,7 @@ TrayManager::TrayManager(QObject *parent)
     , m_trayMenu(nullptr)
     , m_showAction(nullptr)
     , m_quitAction(nullptr)
+    , m_launchLastAction(nullptr)
     , m_versionsMenu(nullptr)
     , m_mainWindow(nullptr)
 {
@@ -65,6 +68,11 @@ void TrayManager::createMenu()
     m_trayMenu->addAction(m_showAction);
     
     m_trayMenu->addSeparator();
+    
+    m_launchLastAction = new QAction(tr("Launch last"), this);
+    m_launchLastAction->setEnabled(false);
+    connect(m_launchLastAction, &QAction::triggered, this, &TrayManager::onLaunchLastFromTray);
+    m_trayMenu->addAction(m_launchLastAction);
     
     m_versionsMenu = new QMenu(tr("Launch version"), m_mainWindow);
     m_trayMenu->addMenu(m_versionsMenu);
@@ -152,4 +160,24 @@ void TrayManager::onLaunchFromTray()
     }
     
     emit launchVersionRequested(info);
+}
+
+void TrayManager::onLaunchLastFromTray()
+{
+    emit launchLastRequested();
+}
+
+void TrayManager::updateLastLaunched(const QString &filePath)
+{
+    m_lastLaunchedPath = filePath;
+    if (!m_launchLastAction) return;
+    
+    if (filePath.isEmpty()) {
+        m_launchLastAction->setText(tr("Launch last"));
+        m_launchLastAction->setEnabled(false);
+    } else {
+        QString fileName = QFileInfo(filePath).fileName();
+        m_launchLastAction->setText(tr("Launch last (%1)").arg(fileName));
+        m_launchLastAction->setEnabled(QFile::exists(filePath));
+    }
 }
